@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Maze Pathfinding Webgame - v0.4</title>
+        <style>
+            body {
+                overflow-wrap: break-word;
+                word-break: break-all;
+            }
+
+            canvas {
+                background: #eeeeee;
+                display: block;
+                margin: 0 auto;
+                border-style: solid;
+                border-width: 1px;
+            }
+
+            .flex {
+                display: flex;
+            }
+            .margin {
+                margin: 8px;
+                display: inline-block;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="flex">
+            <div class="margin">
+                <canvas id="main-canvas" width="1000" height="500"></canvas>
+            </div>
+            <div class="margin">
+                <button onclick="newGame()">New</button>
+                <button onclick="resetGame()">Replay</button>
+                <br>
+
+                <label for="seed">Seed: </label>
+                <input type="text" id="seed">
+                <br>
+
+                <label for="enemy-movement">Enemy movement</label>
+                <input type="checkbox" id="enemy-movement">
+                <br>
+
+                <label for="display-enemy-path">Display enemy path</label>
+                <input type="checkbox" id="display-enemy-path">
+                <br>
+
+                <label for="enemy-count">Enemy count: </label>
+                <input type="text" id="enemy-count" value="1">
+                <br>
+
+                <label for="player-speed">Player speed: </label>
+                <input type="text" id="player-speed" value="10">
+                <br>
+
+                <label for="enemy-speed">Enemy speed: </label>
+                <input type="text" id="enemy-speed" value="3">
+                <br>
+
+                <label for="edge-wrap">Edge wrap: </label>
+                <input type="checkbox" id="edge-wrap">
+                <br>
+
+                <label for="creative">Creative: </label>
+                <input type="checkbox" id="creative">
+                <br>
+
+                <label for="debug">Debug mode: </label>
+                <input type="checkbox" id="debug">
+                <br>
+
+                <label for="h-cost">Use h: </label>
+                <input type="checkbox" id="h-cost" checked="true">
+                <br>
+
+                <pre id="side-panel">Javascript should display data here...</pre>
+            </div>
+        </div>
+
+        <!--<script src=//cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>--><script>!function(f,a,c){var s,l=256,p="random",d=c.pow(l,6),g=c.pow(2,52),y=2*g,h=l-1;function n(n,t,r){function e(){for(var n=u.g(6),t=d,r=0;n<g;)n=(n+r)*l,t*=l,r=u.g(1);for(;y<=n;)n/=2,t/=2,r>>>=1;return(n+r)/t}var o=[],i=j(function n(t,r){var e,o=[],i=typeof t;if(r&&"object"==i)for(e in t)try{o.push(n(t[e],r-1))}catch(n){}return o.length?o:"string"==i?t:t+"\0"}((t=1==t?{entropy:!0}:t||{}).entropy?[n,S(a)]:null==n?function(){try{var n;return s&&(n=s.randomBytes)?n=n(l):(n=new Uint8Array(l),(f.crypto||f.msCrypto).getRandomValues(n)),S(n)}catch(n){var t=f.navigator,r=t&&t.plugins;return[+new Date,f,r,f.screen,S(a)]}}():n,3),o),u=new m(o);return e.int32=function(){return 0|u.g(4)},e.quick=function(){return u.g(4)/4294967296},e.double=e,j(S(u.S),a),(t.pass||r||function(n,t,r,e){return e&&(e.S&&v(e,u),n.state=function(){return v(u,{})}),r?(c[p]=n,t):n})(e,i,"global"in t?t.global:this==c,t.state)}function m(n){var t,r=n.length,u=this,e=0,o=u.i=u.j=0,i=u.S=[];for(r||(n=[r++]);e<l;)i[e]=e++;for(e=0;e<l;e++)i[e]=i[o=h&o+n[e%r]+(t=i[e])],i[o]=t;(u.g=function(n){for(var t,r=0,e=u.i,o=u.j,i=u.S;n--;)t=i[e=h&e+1],r=r*l+i[h&(i[e]=i[o=h&o+t])+(i[o]=t)];return u.i=e,u.j=o,r})(l)}function v(n,t){return t.i=n.i,t.j=n.j,t.S=n.S.slice(),t}function j(n,t){for(var r,e=n+"",o=0;o<e.length;)t[h&o]=h&(r^=19*t[h&o])+e.charCodeAt(o++);return S(t)}function S(n){return String.fromCharCode.apply(0,n)}if(j(c.random(),a),"object"==typeof module&&module.exports){module.exports=n;try{s=require("crypto")}catch(n){}}else"function"==typeof define&&define.amd?define(function(){return n}):c["seed"+p]=n}("undefined"!=typeof self?self:this,[],Math);</script>
+        <script>
+function mod(a, b) {
+  return ((a % b) + b) % b;
+};
+
+function within(x, min, max) {
+    if(x < min) {
+        return false;
+    } else if(x > max) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+function constrain(x, min, max) {
+    if(x < min) {
+        return min;
+    } else if(x > max) {
+        return max;
+    } else {
+        return x;
+    }
+}
+
+function randint(min, max, rng) {
+    // inclusive min, exclusive max
+    if(rng) {
+        return Math.floor(rng() * (max - min)) + min;
+    } else {
+        return Math.floor(Math.random() * (max - min)) + min;
+    }
+}
+
+function popAtIndex(array, index) {
+    var item = array[index];
+    array.splice(index, 1);
+    return item;
+}
+
+function popAtRandom(array, rng) {
+    return popAtIndex(array, randint(0, array.length, rng));
+}
+
+function averagePoint(p1, p2) {
+    return [
+        (p1[0] + p2[0]) / 2,
+        (p1[1] + p2[1]) / 2
+    ]
+}
+
+function interpolate(p1, p2, t) {
+    var tLeft = 1 - t;
+    var interpolated = [];
+    for(let i=0; i<p1.length; i++) {
+        interpolated.push(tLeft * p1 + p2);
+    }
+    return interpolated;
+}
+
+function manhattanDistance(x1, y1, x2, y2) {
+    return Math.abs(x2 - x1) + Math.abs(y2 - y1);
+}
+
+function getAdjacentTiles(x, y) {
+    return [
+        [x + 1, y],
+        [x, y + 1],
+        [x - 1, y],
+        [x, y - 1]
+    ];
+}
+
+function createTileSpace(x, y) {
+    const tiles = [];
+    for(let i=0; i<x; i++) {
+        tiles.push([]);
+        for(let j=0; j<y; j++) {
+            tiles[i].push(0);
+        }
+    }
+    return tiles;
+}
+
+function createMazeNodeGrid(x, y, seed) {
+    var rng = new Math.seedrandom(seed);
+
+    const nodes = createTileSpace(x, y);
+    var start = [randint(0, x, rng), randint(0, y, rng)];
+
+    const stack = [start];
+    nodes[start[0]][start[1]] = start;
+
+    while(stack.length) {
+        var current = stack[stack.length - 1];
+        possibilities = getAdjacentTiles(
+            current[0], current[1]
+        );
+
+        var not_found = true;
+        for(let i=0; i<4; i++) {
+            var pos = popAtRandom(possibilities, rng);
+            if(!within(pos[0], 0, x - 1)) {
+                continue
+            } else if(!within(pos[1], 0, y - 1)) {
+                continue
+            } else if(nodes[pos[0]][pos[1]]) {
+                continue
+            } else {
+                stack.push(pos);
+                nodes[pos[0]][pos[1]] = current;
+
+                not_found = false;
+                break;
+            }
+        }
+        if(not_found) {
+            stack.pop();
+        }
+    }
+
+    return nodes;
+}
+
+function createMaze(x, y, seed) {
+    var nodes = createMazeNodeGrid(x, y, seed);
+    var tiles = createTileSpace(x*2+1, y*2+1);
+
+    for(let i=1; i<tiles.length; i+=2) {
+        for(let j=1; j<tiles[i].length; j+=2) {
+            tiles[i][j] = 1;
+        }
+    }
+
+    for(let i=0; i<nodes.length; i++) {
+        for(let j=0; j<nodes[i].length; j++) {
+            var n = nodes[i][j];
+            if(n) {
+                var pos = averagePoint([i, j], n);
+                pos[0] = pos[0]*2+1;
+                pos[1] = pos[1]*2+1;
+
+                tiles[pos[0]][pos[1]] = 1;
+            }
+        }
+    }
+
+    return tiles
+}
+
+class PathfindingNode {
+    constructor(x, y, connection) {
+        this.x = x;
+        this.y = y;
+        this.connection = connection;
+
+        this.f = null;
+        this.g = null;
+        this.h = null;
+    }
+
+    recurse() {
+        var node = this;
+        var array = [node];
+        while(node.connection) {
+            node = node.connection;
+            array.push(node);
+        }
+        return array;
+    }
+
+    pathArray() {
+        var array = this.recurse();
+        var path = [];
+        for(let i=0; i<array.length; i++) {
+            path.push([array[i].x, array[i].y]);
+        }
+        return path;
+    }
+}
+
+
+class Character {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+
+        this.score = 0;
+        
+        this.nextPos = [this.x, this.y];
+    }
+
+    render() {
+        var [x, y] = interpolate([this.x, this.y], this.nextPos, )
+
+        ctx.beginPath();
+        ctx.rect(this.x*tileSize, this.y*tileSize, tileSize, tileSize);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.closePath();
+
+        var width = tileSize / 4;
+        var size = tileSize / 2;
+        ctx.beginPath();
+        ctx.rect(this.x*tileSize+width, this.y*tileSize+width, size, size);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+        ctx.closePath();
+    }
+
+    update() {
+        // if canMove
+
+        this.inspectUpdate();
+    }
+
+    inspectUpdate() {
+        if(this.x === target.x && this.y === target.y) {
+            this.score++;
+            newTarget();
+        }
+    }
+
+    attemptMove(x, y, ignoreWalls=false) {
+        if(this.lastMoveState >= 0) {
+            if(this.attemptMoveX(x, ignoreWalls)) {
+                return true;
+            } else {
+                return this.attemptMoveY(y, ignoreWalls);
+            }
+        } else {
+            if(this.attemptMoveY(y, ignoreWalls)) {
+                return true;
+            } else {
+                return this.attemptMoveX(x, ignoreWalls);
+            }
+        }
+    }
+
+    attemptMoveX(x, ignoreWalls=false) {
+        if(x) {
+            var result = this.attemptPosition(this.x + x, this.y, ignoreWalls);
+            if(result) {this.lastMoveState = -1};
+            return result;
+        } else {return false;}
+    }
+
+    attemptMoveY(y, ignoreWalls=false) {
+        if(y) {
+            var result = this.attemptPosition(this.x, this.y + y, ignoreWalls);
+            if(result) {this.lastMoveState = 1};
+            return result;
+        } else {return false;}
+    }
+
+    attemptPosition(x, y, ignoreWalls=false) {
+        [x, y] = wrappedPos(x, y);
+        if((atPos(x, y) || ignoreWalls) && withinMap(x, y)) {
+            this.x = x;
+            this.y = y;
+            return true;
+        } else {
+            return false;
+        }
+    }
+}
+
+class Player extends Character {
+    constructor(x, y, color) {
+        super(x, y, color);
+
+        this.lastMoveState = 0;
+    }
+
+    update() {
+        if(canMove(playerSpeed.value)) {
+            var x = 0;
+            var y = 0;
+
+            if(keysPressed["w"] || keysPressed["ArrowUp"]) {y -= 1;}
+            if(keysPressed["a"] || keysPressed["ArrowLeft"]) {x -= 1;}
+            if(keysPressed["s"] || keysPressed["ArrowDown"]) {y += 1;}
+            if(keysPressed["d"] || keysPressed["ArrowRight"]) {x += 1;}
+
+            if(creative.checked) {
+                // this.move(x, y);
+                var success = this.attemptMove(x, y, true);
+                if(success) {
+                    setAtPos(this.x, this.y, 1);
+                    updatePathfinding();
+                }
+            } else {
+                this.attemptMove(x, y);
+            }
+        }
+
+        this.inspectUpdate();
+    }
+
+    // move(x, y) {
+    //     if(this.lastMoveState >= 0) {
+    //         if(!this.moveX(x)) {this.moveY(y);}
+    //     } else {
+    //         if(!this.moveY(y)) {this.moveX(x);}
+    //     }
+    // }
+
+    // moveX(x) {
+    //     if(x) {
+    //         this.x += x;
+    //         this.lastMoveState = -1;
+    //         return true;
+    //     } else {return false;}
+    // }
+
+    // moveY(y) {
+    //     if(y) {
+    //         this.y += y;
+    //         this.lastMoveState = 1;
+    //         return true;
+    //     } else {return false;}
+    // }
+}
+
+class Enemy extends Character {
+    constructor(x, y, color) {
+        super(x, y, color);
+
+        this.path = [];
+        this.pathNodes = [];
+    }
+
+    render() {
+        if(debug.checked) {
+            for(let i=0; i<this.pathNodes.length; i++) {
+                var l = this.pathNodes[i];
+                ctx.beginPath();
+                ctx.moveTo(...l[0]);
+                ctx.lineTo(...l[1]);
+                ctx.strokeStyle = "#00ff00";
+                ctx.stroke();
+                ctx.closePath();
+            }
+        }
+
+        if(displayEnemyPath.checked) {
+            var half = tileSize / 2;
+            ctx.beginPath();
+            ctx.moveTo(this.x*tileSize+half, this.y*tileSize+half)
+            for(let i=this.path.length-1; i>=0; i--) {
+                ctx.lineTo(this.path[i][0]*tileSize+half, this.path[i][1]*tileSize+half);
+            }
+            ctx.strokeStyle = this.color;
+            ctx.stroke();
+            ctx.closePath();
+        }
+
+        super.render();
+    }
+
+    update() {
+        if(enemyMovement.checked && this.path.length) {
+            if(canMove(enemySpeed.value)) {
+                [this.x, this.y] = this.path.pop();
+                this.inspectUpdate();
+            }
+        }
+    }
+
+    pathfind() {
+        // debug
+        this.pathNodes = [];
+
+        if(!atPos(target.x, target.y)) {return false;}
+
+        var start = new PathfindingNode(this.x, this.y);
+        start.g = 0;
+        start.f = 0;
+
+        var open = [start];
+        var closed = [];
+
+        var iteration = 0;
+        while(open.length) {
+            // finding the best node
+            var bestIndex = 0;
+            for(let i=1; i<open.length; i++) {
+                if(open[i].f < open[bestIndex].f) {
+                    bestIndex = i;
+                }
+            }
+            var q = popAtIndex(open, bestIndex);
+
+            // debug
+            var v = q.connection;
+            if(v) {
+                var width = tileSize / 2;
+                this.pathNodes.push([
+                    [q.x*tileSize+width, q.y*tileSize+width],
+                    [v.x*tileSize+width, v.y*tileSize+width]
+                ]);
+            }
+
+            // create successors
+            var adjacents = getAdjacentTiles(q.x, q.y);
+            for(let i=0; i<adjacents.length; i++) {
+                var p = adjacents[i];
+
+                // is it blocked?
+                if(!atPos(...p)) {continue;}
+
+                // create successor
+                var n = new PathfindingNode(...wrappedPos(...p), q);
+
+                // is that the target?
+                if(n.x === target.x && n.y === target.y) {
+                    //return n.array();
+                    this.path = n.pathArray();
+                    this.path.pop();
+                    return true;
+                }
+
+                // cost
+                n.g = q.g + 1;
+                if(useH.checked) {
+                    n.h = manhattanDistance(n.x, n.y, target.x, target.y);
+                } else {
+                    n.h = 0;
+                }
+                n.f = n.g + n.h;
+
+                // check if valid
+                var valid = true;
+                for(let i=0; i<open.length; i++) {
+                    var o = open[i];
+                    if(n.x === o.x && n.y === o.y) {
+                        if(n.f >= o.f) {
+                            valid = false;
+                            break;
+                        }
+                    }
+                }
+                for(let i=0; i<closed.length; i++) {
+                    var c = closed[i];
+                    if(n.x === c.x && n.y === c.y) {
+                        if(n.f >= c.f) {
+                            valid = false;
+                            break;
+                        }
+                    }
+                }
+                if(valid) {
+                    open.push(n);
+                }
+            }
+            closed.push(q);
+        }
+    }
+}
+
+class Target {
+    constructor() {
+        [this.x, this.y] = selectOpenSpace();
+    }
+
+    render() {
+        var radius = tileSize/2;
+        ctx.beginPath();
+        ctx.arc(this.x*tileSize+radius, this.y*tileSize+radius, radius, 0, Math.PI*2);
+        ctx.fillStyle = "#00ff00";
+        ctx.fill();
+        ctx.closePath();
+    }
+}
+
+
+function drawMap() {
+    for(let i=0; i<mapWidth; i++) {
+        for(let j=0; j<mapHeight; j++) {
+            ctx.beginPath();
+            ctx.rect(
+                i*tileSize, j*tileSize,
+                tileSize, tileSize
+            );
+            if(atPos(i, j)) {
+                ctx.fillStyle = "#ffffff";
+            } else {
+                ctx.fillStyle = "#000000";
+            }
+            ctx.fill();
+            ctx.closePath();
+        }
+    }
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    drawMap();
+
+    for(let i=0; i<enemies.length; i++) {
+        enemies[i].render();
+    }
+    player.render();
+    target.render();
+
+    updateSidePanel();
+}
+
+function update() {
+    ticks++;
+
+    player.update();
+    for(let i=0; i<enemies.length; i++) {
+        enemies[i].update();
+    }
+}
+
+
+const keysPressed = {};
+function keyDownHandler(e) {
+    keysPressed[e.key] = true;
+}
+function keyUpHandler(e) {
+    keysPressed[e.key] = false;
+}
+
+function clickHandler() {
+    // paragraph.style.display = "block";
+    // paragraph.innerHTML += "!";
+}
+
+
+function canMove(speed) {
+    speed = constrain(speed, 0, ticksPerSecond);
+
+    var divisor = ticksPerSecond / speed;
+    if(Math.floor(mod(ticks, divisor)) == 0) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+function withinMap(x, y) {
+    if(!within(x, 0, mapWidth-1)) {
+        return false;
+    } else if(!within(y, 0, mapHeight-1)) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+function wrappedPos(x, y) {
+    if(edgeWrap.checked) {
+        return [mod(x, mapWidth), mod(y, mapHeight)];
+    } else {
+        return [x, y];
+    }
+}
+
+function atPos(x, y) {
+    [x, y] = wrappedPos(x, y);
+    if(withinMap(x, y)) {
+        return map[x][y];
+    } else {
+        return undefined;
+    }
+}
+
+function setAtPos(x, y, value) {
+    [x, y] = wrappedPos(x, y);
+    if(!within(x, 0, mapWidth-1)) {
+        return false;
+    } else if(!within(y, 0, mapHeight-1)) {
+        return false;
+    }
+    map[x][y] = value;
+    return true;
+}
+
+function selectOpenSpace() {
+    var x = randint(0, mapWidth);
+    var y = randint(0, mapHeight);
+    while(!atPos(x, y)) {
+        var x = randint(0, mapWidth);
+        var y = randint(0, mapHeight);
+    }
+    return [x, y];
+}
+
+function updatePathfinding() {
+    for(let i=0; i<enemies.length; i++) {
+        enemies[i].pathfind();
+    }
+}
+
+function newTarget() {
+    target = new Target();
+    updatePathfinding();
+}
+
+function resetGame() {
+    map = createMaze(generationX, generationY, currentSeed);
+    seed.value = currentSeed;
+
+    if(enemyCount.value < 0) {
+        enemyCount.value = 1;
+    }
+
+    playerSpeed.value = constrain(playerSpeed.value, 0, 10);
+    enemySpeed.value = constrain(enemySpeed.value, 0, 10);
+    
+    player = new Player(...selectOpenSpace(), "#0000ff");
+    enemies = [];
+    for(let i=0; i<enemyCount.value; i++) {
+        enemies.push(new Enemy(...selectOpenSpace(), `rgb(${randint(128, 256)}, 0, 0)`))
+    }
+    newTarget();
+}
+
+function newGame() {
+    currentSeed = randint(0, 1000000);
+    // map = createMaze(
+    //     // Math.floor((canvas.width - tileSize) / tileSize / 2),
+    //     // Math.floor((canvas.height - tileSize) / tileSize / 2)
+    //     generationX, generationY,
+    //     seed.value
+    // );
+    resetGame();
+}
+
+function updateSidePanel() {
+    sidePanel.innerHTML = `seed: ${currentSeed}
+player score: ${player.score}`;
+    for(let i=0; i<enemies.length; i++) {
+        sidePanel.innerHTML += `\nenemy score: ${enemies[i].score}`
+    }
+}
+
+// function toggleEnemyMovement() {
+//     enemyMovement = !enemyMovement;
+// }
+
+// function toggleEnemyPathDisplay() {
+//     displayEnemyPath = !displayEnemyPath;
+// }
+
+
+var canvas = document.getElementById("main-canvas");
+var ctx = canvas.getContext("2d");
+
+var sidePanel = document.getElementById("side-panel");
+
+var seed = document.getElementById("seed");
+
+var enemyMovement = document.getElementById("enemy-movement");
+var displayEnemyPath = document.getElementById("display-enemy-path");
+var enemyCount = document.getElementById("enemy-count");
+
+var playerSpeed = document.getElementById("player-speed");
+var enemySpeed = document.getElementById("enemy-speed");
+
+var edgeWrap = document.getElementById("edge-wrap");
+
+var creative = document.getElementById("creative");
+
+var debug = document.getElementById("debug");
+var useH = document.getElementById("h-cost");
+
+var ticksPerSecond = 10;
+var ticks = -1;
+
+var tileSize = 25;
+var generationX = Math.floor((canvas.width - tileSize) / tileSize / 2);
+var generationY = Math.floor((canvas.height - tileSize) / tileSize / 2);
+var mapWidth = generationX * 2 + 1;
+var mapHeight = generationY * 2 + 1;
+
+var currentSeed;
+
+var map;
+var player;
+var enemies;
+var target;
+newGame();
+
+var msBetweenUpdate = 1000/ticksPerSecond;
+
+var date = new Date();
+var pastTime = date.getTime();
+var incomingTime = pastTime + msBetweenUpdate;
+
+setInterval(draw, 10);
+setInterval(update, msBetweenUpdate);
+
+// https://www.w3schools.com/jsref/dom_obj_event.asp
+document.addEventListener("keydown", keyDownHandler, false);
+document.addEventListener("keyup", keyUpHandler, false);
+document.addEventListener("click", clickHandler);
+
+// JSON.stringify()
+// JSON.parse()
+        </script>
+    </body>
+</html>
